@@ -44,7 +44,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	logger.Info("Соединение с бд успешно")
 	defer database.Close()
+
+	// 6. Репозитории
+	//userRepo :=
 
 	logger.Info("Запуск сервера на порту", "port", cfg.Server.Port)
 
