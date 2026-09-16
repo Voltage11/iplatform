@@ -15,6 +15,7 @@ const (
 	ErrUnauthorized  ErrType = "UNAUTHORIZED"
 	ErrForbidden     ErrType = "FORBIDDEN"
 	ErrInternal      ErrType = "INTERNAL"
+	ErrTimeout       ErrType = "TIMEOUT"
 )
 
 // AppError — кастомная ошибка
@@ -63,6 +64,10 @@ func NewForbidden(msg string, err error) error {
 
 func NewInternal(msg string, err error) error {
 	return &AppError{Type: ErrInternal, Message: msg, Err: err}
+}
+
+func NewTimeout(msg string, err error) error {
+	return &AppError{Type: ErrTimeout, Message: msg, Err: err}
 }
 
 // AsAppError извлекает *AppError из цепочки ошибок

@@ -26,6 +26,8 @@ func HTTPStatusFromError(err error) int {
 		return http.StatusForbidden
 	case ErrInternal:
 		return http.StatusInternalServerError
+	case ErrTimeout:
+		return http.StatusGatewayTimeout
 	default:
 		return http.StatusInternalServerError
 	}
