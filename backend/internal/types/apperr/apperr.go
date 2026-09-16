@@ -1,11 +1,11 @@
-package types
+package apperr
 
 import (
 	"errors"
 	"fmt"
 )
 
-// ErrType — кастомная ошибка
+// ErrType —
 type ErrType string
 
 const (
@@ -17,14 +17,13 @@ const (
 	ErrInternal      ErrType = "INTERNAL"
 )
 
-// AppError — ошибка с категорией
+// AppError — кастомная ошибка
 type AppError struct {
 	Type    ErrType `json:"type"`
 	Message string  `json:"message"`
 	Err     error   `json:"-"`
 }
 
-// Error реализует интерфейс error
 func (e *AppError) Error() string {
 	if e.Err != nil {
 		return fmt.Sprintf("[%s] %s: %v", e.Type, e.Message, e.Err)
@@ -32,16 +31,16 @@ func (e *AppError) Error() string {
 	return fmt.Sprintf("[%s] %s", e.Type, e.Message)
 }
 
-// Unwrap возвращает оригинальную ошибку
 func (e *AppError) Unwrap() error { return e.Err }
 
-// Is позволяет сравнивать ошибки по типу:
+// Is позволяет сравнивать ошибки по типу через errors.Is:
+//
+//	errors.Is(err, &apperr.AppError{Type: apperr.ErrNotFound})
 func (e *AppError) Is(target error) bool {
 	t, ok := target.(*AppError)
 	return ok && t.Type == e.Type
 }
 
-// Конструкторы
 func NewNotFound(msg string, err error) error {
 	return &AppError{Type: ErrNotFound, Message: msg, Err: err}
 }
@@ -66,7 +65,7 @@ func NewInternal(msg string, err error) error {
 	return &AppError{Type: ErrInternal, Message: msg, Err: err}
 }
 
-// AsAppError извлекает *AppError из цепочки ошибок.
+// AsAppError извлекает *AppError из цепочки ошибок
 func AsAppError(err error) (*AppError, bool) {
 	if err == nil {
 		return nil, false
@@ -76,4 +75,10 @@ func AsAppError(err error) (*AppError, bool) {
 		return appErr, true
 	}
 	return nil, false
+}
+
+// IsAppError сообщает, является ли ошибка кастомной
+func IsAppError(err error) bool {
+	_, ok := AsAppError(err)
+	return ok
 }
