@@ -2,62 +2,47 @@ package config
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/joho/godotenv"
 )
 
-// ConfigLog конфигурация лога
-type ConfigLog struct {
+type LogConfig struct {
 	Level int
 }
 
-// ServerConfig конфигурация сервера
-type ServerConfig struct {
-	Port            string
-	ReadTimeoutSec  time.Duration
-	WriteTimeoutSec time.Duration
-	IdleTimeoutSec  time.Duration
-}
-
-// Config конфигурация приложения
 type Config struct {
-	Log      ConfigLog
+	Log      LogConfig
 	Server   ServerConfig
 	Database DatabaseConfig
 }
 
 func New() (*Config, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("file .env not load: %v", err)
-	}
-	// Логгер
-	configLog := ConfigLog{
-		Level: getEnvInt("LOG_LEVEL", 0),
-	}
+	_ = godotenv.Load()
 
-	// Сервер
-	serverConfig := newServerConfig()
-
-	// DB
-	databaseConfig, err := newDatabaseConfig()
+	logCfg, err := newLogConfig()
 	if err != nil {
-		return nil, fmt.Errorf("ошибка загрузки database конфигурации: %v", err)
+		return nil, fmt.Errorf("log config: %w", err)
+	}
+	srv, err := newServerConfig()
+	if err != nil {
+		return nil, fmt.Errorf("server config: %w", err)
+	}
+	db, err := newDatabaseConfig()
+	if err != nil {
+		return nil, fmt.Errorf("database config: %w", err)
 	}
 
 	return &Config{
-		Log:      configLog,
-		Server:   serverConfig,
-		Database: *databaseConfig,
+		Log:      logCfg,
+		Server:   srv,
+		Database: db,
 	}, nil
 }
 
-// newServerConfig создание конфига, чтение из переменных окружения
-func newServerConfig() ServerConfig {
-	return ServerConfig{
-		Port:            getEnv("SERVER_PORT", "8080"),
-		ReadTimeoutSec:  time.Duration(getEnvInt("SERVER_READ_TIMEOUT_SEC", 10)),
-		WriteTimeoutSec: time.Duration(getEnvInt("SERVER_WRITE_TIMEOUT_SEC", 60)),
-		IdleTimeoutSec:  time.Duration(getEnvInt("SERVER_IDLE_TIMEOUT_SEC", 60)),
+func newLogConfig() (LogConfig, error) {
+	level, err := getEnvInt("LOG_LEVEL", 0)
+	if err != nil {
+		return LogConfig{}, err
 	}
+	return LogConfig{Level: level}, nil
 }

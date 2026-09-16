@@ -16,13 +16,14 @@ const (
 	LevelError Level = 8
 )
 
+// Logger — реализация логгера
 type Logger struct {
 	logger *slog.Logger
 	level  slog.Level
 }
 
 // New создаёт логгер с указанным минимальным уровнем
-// Паникует, если уровень неизвестен
+// Паникует, если уровень неизвестен — это ошибка конфигурации
 func New(level Level) *Logger {
 	slogLevel, err := loggerLevelFromLevel(level)
 	if err != nil {
@@ -37,9 +38,23 @@ func New(level Level) *Logger {
 	}
 }
 
-// SetAsDefault устанавливает логгер как глобальный
+// ParseLevel переводит int в Level, проверяя допустимость значения
+func ParseLevel(v int) (Level, error) {
+	level := Level(v)
+	if _, err := loggerLevelFromLevel(level); err != nil {
+		return 0, err
+	}
+	return level, nil
+}
+
+// SetAsDefault устанавливает логгер как глобальный slog.Default
 func (l *Logger) SetAsDefault() {
 	slog.SetDefault(l.logger)
+}
+
+// Slog возвращает *slog.Logger
+func (l *Logger) Slog() *slog.Logger {
+	return l.logger
 }
 
 // Debug логирует сообщение уровня Debug
@@ -62,6 +77,12 @@ func (l *Logger) Error(msg string, args ...any) {
 	l.logger.Error(msg, args...)
 }
 
+// Fatal логирует сообщение уровня Error и завершает процесс
+func (l *Logger) Fatal(msg string, args ...any) {
+	l.logger.Error(msg, args...)
+	os.Exit(1)
+}
+
 // loggerLevelFromLevel переводит кастомный уровень в slog.Level
 func loggerLevelFromLevel(level Level) (slog.Level, error) {
 	switch level {
@@ -74,21 +95,6 @@ func loggerLevelFromLevel(level Level) (slog.Level, error) {
 	case LevelError:
 		return slog.LevelError, nil
 	default:
-		return 0, fmt.Errorf("unknown level: %d", level)
-	}
-}
-
-func GetLoggerLevelFromInt(level int) Level {
-	switch level {
-	case -4:
-		return LevelDebug
-	case 0:
-		return LevelInfo
-	case 4:
-		return LevelWarn
-	case 8:
-		return LevelError
-	default:
-		return LevelInfo
+		return 0, fmt.Errorf("неизвестный уровень: %d", level)
 	}
 }

@@ -1,8 +1,12 @@
 package config
 
-import "fmt"
+import (
+	"log/slog"
+	"net"
+	"net/url"
+)
 
-// DatabaseConfig конфиг бд
+// dbconfig.go
 type DatabaseConfig struct {
 	Host     string
 	Port     string
@@ -13,64 +17,55 @@ type DatabaseConfig struct {
 	MaxConns int32
 }
 
-func (c *DatabaseConfig) DSN() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		c.User, c.Password, c.Host, c.Port, c.DBName, c.SSLMode)
+func (c DatabaseConfig) DSN() string {
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.User, c.Password),
+		Host:   net.JoinHostPort(c.Host, c.Port),
+		Path:   c.DBName,
+	}
+	q := u.Query()
+	q.Set("sslmode", c.SSLMode)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
-// validate проверяет корректность конфигурации БД
-func (c *DatabaseConfig) validate() error {
-	if c.User == "" {
-		return fmt.Errorf("DB_USER не может быть пустым")
-	}
-	if c.Password == "" {
-		return fmt.Errorf("DB_PASSWORD не может быть пустым")
-	}
-	if c.DBName == "" {
-		return fmt.Errorf("DB_NAME не может быть пустым")
-	}
-	return nil
+func (c DatabaseConfig) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("host", c.Host),
+		slog.String("port", c.Port),
+		slog.String("db", c.DBName),
+		slog.String("sslmode", c.SSLMode),
+		slog.Int("max_conns", int(c.MaxConns)),
+	)
 }
 
-func newDatabaseConfig() (*DatabaseConfig, error) {
+func newDatabaseConfig() (DatabaseConfig, error) {
 	user, err := getEnvReq("DB_USER")
 	if err != nil {
-		return nil, err
+		return DatabaseConfig{}, err
 	}
-
 	password, err := getEnvReq("DB_PASSWORD")
 	if err != nil {
-		return nil, err
+		return DatabaseConfig{}, err
 	}
-
 	dbName, err := getEnvReq("DB_NAME")
 	if err != nil {
-		return nil, err
+		return DatabaseConfig{}, err
 	}
 
-	sslModeInt := getEnvInt("DB_SSL_MODE", 0)
-	sslMode := ""
-	if sslModeInt == 0 {
-		sslMode = "disable"
-	} else {
-		sslMode = "enable"
+	maxConns, err := getEnvInt("DB_MAX_CONNS", 10)
+	if err != nil {
+		return DatabaseConfig{}, err
 	}
 
-	maxConns := getEnvInt("DB_MAX_CONNS", 10)
-
-	dbConfig := &DatabaseConfig{
+	return DatabaseConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     getEnv("DB_PORT", "5432"),
 		User:     user,
 		Password: password,
 		DBName:   dbName,
-		SSLMode:  sslMode,
+		SSLMode:  getEnv("DB_SSL_MODE", "disable"),
 		MaxConns: int32(maxConns),
-	}
-
-	if err := dbConfig.validate(); err != nil {
-		return nil, err
-	}
-
-	return dbConfig, nil
+	}, nil
 }

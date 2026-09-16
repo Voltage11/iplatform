@@ -6,50 +6,29 @@ import (
 	"strconv"
 )
 
-// ////////////////// Работа с переменными окружения, чтение
-func getEnvReq(keyName string) (string, error) {
-	val, ok := os.LookupEnv(keyName)
-	if !ok {
-		return "", fmt.Errorf("key not found in .env: %s", keyName)
+func getEnv(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
-
-	if val == "" {
-		return "", fmt.Errorf("key is empty in .env: %s", keyName)
-	}
-
-	return val, nil
+	return def
 }
 
-func getEnv(keyName, defaultValue string) string {
-	val := os.Getenv(keyName)
-
-	if val == "" {
-		return defaultValue
+func getEnvReq(key string) (string, error) {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return "", fmt.Errorf("env %s обязательный ключ и не может быть пустым", key)
 	}
-
-	return val
+	return v, nil
 }
 
-func getEnvInt(keyName string, defaultValue int) int {
-	val := os.Getenv(keyName)
-
-	valInt, err := strconv.Atoi(val)
-
+func getEnvInt(key string, def int) (int, error) {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return def, nil
+	}
+	n, err := strconv.Atoi(v)
 	if err != nil {
-		return defaultValue
+		return 0, fmt.Errorf("env %s: тип int, равен %q", key, v)
 	}
-
-	return valInt
-}
-
-func getEnvIntReq(keyName string) (int, error) {
-	val := os.Getenv(keyName)
-
-	valInt, err := strconv.Atoi(val)
-
-	if err != nil {
-		return 0, fmt.Errorf("key from .env not int: %s, value: %s", keyName, val)
-	}
-
-	return valInt, nil
+	return n, nil
 }
