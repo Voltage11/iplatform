@@ -77,3 +77,18 @@ func loggerLevelFromLevel(level Level) (slog.Level, error) {
 		return 0, fmt.Errorf("unknown level: %d", level)
 	}
 }
+
+func GetLoggerLevelFromInt(level int) Level {
+	switch level {
+	case -4:
+		return LevelDebug
+	case 0:
+		return LevelInfo
+	case 4:
+		return LevelWarn
+	case 8:
+		return LevelError
+	default:
+		return LevelInfo
+	}
+}
