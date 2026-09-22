@@ -1,12 +1,16 @@
 package config
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type ServerConfig struct {
-	Port         string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
+	Port           string
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	IdleTimeout    time.Duration
+	AllowedOrigins []string
 }
 
 func newServerConfig() (ServerConfig, error) {
@@ -22,10 +26,15 @@ func newServerConfig() (ServerConfig, error) {
 	if err != nil {
 		return ServerConfig{}, err
 	}
+
+	alloweOriginsStr := getEnv("ALLOWED_ORIGONS", "http://localhost:5173,http://127.0.0.1:5173")
+	alloweOrigins := strings.Split(alloweOriginsStr, ",")
+
 	return ServerConfig{
-		Port:         getEnv("SERVER_PORT", "8080"),
-		ReadTimeout:  time.Duration(read) * time.Second,
-		WriteTimeout: time.Duration(write) * time.Second,
-		IdleTimeout:  time.Duration(idle) * time.Second,
+		Port:           getEnv("SERVER_PORT", "8080"),
+		ReadTimeout:    time.Duration(read) * time.Second,
+		WriteTimeout:   time.Duration(write) * time.Second,
+		IdleTimeout:    time.Duration(idle) * time.Second,
+		AllowedOrigins: alloweOrigins,
 	}, nil
 }

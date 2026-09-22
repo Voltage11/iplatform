@@ -7,6 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+
 	"github.com/Voltage11/iplatform/internal/config"
 	"github.com/Voltage11/iplatform/internal/db"
 	"github.com/Voltage11/iplatform/internal/repo"
@@ -57,7 +61,23 @@ func run() error {
 
 	logger.Info("Запуск сервера на порту", "port", cfg.Server.Port)
 
-	// 6. Запуск HTTP-сервера и ожидание ctx.Done()
+	// 8. Запуск HTTP-сервера и ожидание ctx.Done()
+	r := chi.NewRouter()
+	// CORS middleware
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   cfg.Server.AllowedOrigins,
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Requested-With"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+
+	// Стандартные middleware chi
+	r.Use(middleware.RequestID)
+	r.Use(middleware.ClientIPFromRemoteAddr)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(cfg.Server.ReadTimeout))
 
 	return nil
 }

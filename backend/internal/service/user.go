@@ -47,11 +47,19 @@ func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, 
 func (s *UserService) Create(ctx context.Context, user *domain.User) error {
 	// TODO Захешируем пароль
 
+	passwordWithoutHash := user.PasswordHash
+	passwordHash, err := s.HashPassword(passwordWithoutHash)
+	if err != nil {
+		return apperr.NewInternal("Внутренняя ошибка сервиса", err)
+	}
+
+	user.PasswordHash = passwordHash
+
 	now := time.Now().UTC()
 	user.CreatedAt = now
 	user.UpdatedAt = now
 
-	err := s.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
+	err = s.transactor.WithinTransaction(ctx, func(txCtx context.Context) error {
 		existUser, err := s.users.GetByEmail(txCtx, user.Email)
 		switch {
 		case err == nil && existUser != nil:
