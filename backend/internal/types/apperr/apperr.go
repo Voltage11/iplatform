@@ -87,3 +87,13 @@ func IsAppError(err error) bool {
 	_, ok := AsAppError(err)
 	return ok
 }
+
+// IsTypeAppError сообщает, является ли ошибка кастомной определенного типа
+func IsTypeAppError(err error, errType ErrType) bool {
+	appErr, ok := AsAppError(err)
+	if !ok {
+		return false
+	}
+
+	return appErr.Type == errType
+}

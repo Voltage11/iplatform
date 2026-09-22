@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/Voltage11/iplatform/internal/db"
 	"github.com/Voltage11/iplatform/internal/domain"
 	"github.com/Voltage11/iplatform/internal/types/apperr"
 	"github.com/Voltage11/iplatform/internal/types/filterbool"
@@ -32,8 +33,9 @@ func (u *UserRepo) Create(ctx context.Context, user *domain.User) error {
 		VALUES($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
 	`
+	q := db.QuerierFrom(ctx, u.pool)
 
-	if err := u.pool.QueryRow(ctx, sql,
+	if err := q.QueryRow(ctx, sql,
 		user.Email,
 		user.FirstName,
 		user.LastName,
@@ -52,7 +54,7 @@ func (u *UserRepo) Create(ctx context.Context, user *domain.User) error {
 // Get возвращает пользователя по ID
 // Мягко удалённые записи (deleted_at IS NOT NULL) не возвращаются
 // Если запись не найдена — возвращает apperr.ErrNotFound
-func (u *UserRepo) Get(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+func (u *UserRepo) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	const sql = `
 		SELECT id, email, first_name, last_name, password_hash, is_admin, is_active, created_at, updated_at, deleted_at
 		FROM users
@@ -62,7 +64,40 @@ func (u *UserRepo) Get(ctx context.Context, id uuid.UUID) (*domain.User, error) 
 	user := &domain.User{}
 	var deletedAt *time.Time
 
-	if err := u.pool.QueryRow(ctx, sql, id).Scan(
+	q := db.QuerierFrom(ctx, u.pool)
+
+	if err := q.QueryRow(ctx, sql, id).Scan(
+		&user.ID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.PasswordHash,
+		&user.IsAdmin,
+		&user.IsActive,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&deletedAt,
+	); err != nil {
+		return nil, apperr.NewPostgresError(err)
+	}
+
+	user.DeletedAt = deletedAt
+	return user, nil
+}
+
+func (u *UserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
+	const sql = `
+		SELECT id, email, first_name, last_name, password_hash, is_admin, is_active, created_at, updated_at, deleted_at
+		FROM users
+		WHERE email = $1
+	`
+
+	user := &domain.User{}
+	var deletedAt *time.Time
+
+	q := db.QuerierFrom(ctx, u.pool)
+
+	if err := q.QueryRow(ctx, sql, email).Scan(
 		&user.ID,
 		&user.Email,
 		&user.FirstName,
@@ -95,8 +130,9 @@ func (u *UserRepo) Update(ctx context.Context, user *domain.User) error {
 			updated_at = $6
 		WHERE id = $7 AND deleted_at IS NULL
 	`
+	q := db.QuerierFrom(ctx, u.pool)
 
-	result, err := u.pool.Exec(ctx, sql,
+	result, err := q.Exec(ctx, sql,
 		user.Email,
 		user.FirstName,
 		user.LastName,
@@ -126,7 +162,10 @@ func (u *UserRepo) SoftDelete(ctx context.Context, userID uuid.UUID) error {
 	`
 
 	now := time.Now().UTC()
-	result, err := u.pool.Exec(ctx, sql, now, userID)
+
+	q := db.QuerierFrom(ctx, u.pool)
+
+	result, err := q.Exec(ctx, sql, now, userID)
 	if err != nil {
 		return apperr.NewPostgresError(err)
 	}
@@ -146,8 +185,9 @@ func (u *UserRepo) SoftUnDelete(ctx context.Context, userID uuid.UUID) error {
 		SET deleted_at = NULL, updated_at = $1
 		WHERE id = $2 AND deleted_at IS NOT NULL
 	`
+	q := db.QuerierFrom(ctx, u.pool)
 
-	result, err := u.pool.Exec(ctx, sql, time.Now().UTC(), userID)
+	result, err := q.Exec(ctx, sql, time.Now().UTC(), userID)
 	if err != nil {
 		return apperr.NewPostgresError(err)
 	}
@@ -166,8 +206,9 @@ func (u *UserRepo) ChangePassword(ctx context.Context, userID uuid.UUID, newPass
 		SET password_hash = $1
 		WHERE id = $2 AND deleted_at IS NULL
 	`
+	q := db.QuerierFrom(ctx, u.pool)
 
-	result, err := u.pool.Exec(ctx, sql, userID, newPassword)
+	result, err := q.Exec(ctx, sql, newPassword, userID)
 	if err != nil {
 		return apperr.NewPostgresError(err)
 	}
@@ -229,9 +270,10 @@ func (u *UserRepo) GetList(ctx context.Context, filter UserFilter) ([]*domain.Us
 		where += fmt.Sprintf(" AND is_active = $%d", len(args))
 	}
 
+	q := db.QuerierFrom(ctx, u.pool)
 	// Общее количество — до применения LIMIT/OFFSET.
 	var total int64
-	if err := u.pool.QueryRow(ctx, baseCount+where, args...).Scan(&total); err != nil {
+	if err := q.QueryRow(ctx, baseCount+where, args...).Scan(&total); err != nil {
 		return nil, 0, apperr.NewPostgresError(err)
 	}
 
@@ -244,7 +286,7 @@ func (u *UserRepo) GetList(ctx context.Context, filter UserFilter) ([]*domain.Us
 	sql := baseSelect + where +
 		fmt.Sprintf(" ORDER BY id LIMIT $%d OFFSET $%d", len(args)-1, len(args))
 
-	rows, err := u.pool.Query(ctx, sql, args...)
+	rows, err := q.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, 0, apperr.NewPostgresError(err)
 	}

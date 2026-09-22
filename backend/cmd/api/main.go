@@ -9,6 +9,8 @@ import (
 
 	"github.com/Voltage11/iplatform/internal/config"
 	"github.com/Voltage11/iplatform/internal/db"
+	"github.com/Voltage11/iplatform/internal/repo"
+	"github.com/Voltage11/iplatform/internal/service"
 	"github.com/Voltage11/iplatform/pkg/applog"
 )
 
@@ -48,7 +50,10 @@ func run() error {
 	defer database.Close()
 
 	// 6. Репозитории
-	//userRepo :=
+	userRepo := repo.NewUserRepo(database.Pool())
+
+	// 7. Сервисы
+	userService := service.NewUserService(userRepo, database)
 
 	logger.Info("Запуск сервера на порту", "port", cfg.Server.Port)
 
