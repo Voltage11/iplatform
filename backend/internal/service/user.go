@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/Voltage11/iplatform/internal/db"
 	"github.com/Voltage11/iplatform/internal/domain"
@@ -26,12 +27,14 @@ type UserRepo interface {
 type UserService struct {
 	users      UserRepo
 	transactor db.Transactor
+	pepper     string
 }
 
-func NewUserService(users UserRepo, transactor db.Transactor) *UserService {
+func NewUserService(users UserRepo, transactor db.Transactor, pepper string) *UserService {
 	return &UserService{
 		users:      users,
 		transactor: transactor,
+		pepper:     pepper,
 	}
 }
 
@@ -69,4 +72,17 @@ func (s *UserService) Create(ctx context.Context, user *domain.User) error {
 	}
 
 	return nil
+}
+
+func (s *UserService) HashPassword(plain string) (string, error) {
+	// pepper дописываем к паролю — так и хранится в хеше bcrypt
+	h, err := bcrypt.GenerateFromPassword([]byte(plain+s.pepper), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(h), nil
+}
+
+func (s *UserService) VerifyPassword(hash, plain string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain+s.pepper)) == nil
 }

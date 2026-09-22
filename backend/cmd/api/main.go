@@ -53,7 +53,7 @@ func run() error {
 	userRepo := repo.NewUserRepo(database.Pool())
 
 	// 7. Сервисы
-	userService := service.NewUserService(userRepo, database)
+	userService := service.NewUserService(userRepo, database, cfg.HashPreffix)
 
 	logger.Info("Запуск сервера на порту", "port", cfg.Server.Port)
 
