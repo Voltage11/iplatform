@@ -38,9 +38,14 @@ func NewUserService(users UserRepo, transactor db.Transactor, pepper string) *Us
 	}
 }
 
-// GetUser — получение пользователя
+// GetByID — получение пользователя
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return s.users.GetByID(ctx, id)
+}
+
+// GetByEmail — получение пользователя по email
+func (s *UserService) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
+	return s.users.GetByEmail(ctx, email)
 }
 
 // CreateUser — создание пользователя
@@ -48,7 +53,7 @@ func (s *UserService) Create(ctx context.Context, user *domain.User) error {
 	// TODO Захешируем пароль
 
 	passwordWithoutHash := user.PasswordHash
-	passwordHash, err := s.HashPassword(passwordWithoutHash)
+	passwordHash, err := s.ToHash(passwordWithoutHash)
 	if err != nil {
 		return apperr.NewInternal("Внутренняя ошибка сервиса", err)
 	}
@@ -82,7 +87,7 @@ func (s *UserService) Create(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
-func (s *UserService) HashPassword(plain string) (string, error) {
+func (s *UserService) ToHash(plain string) (string, error) {
 	// pepper дописываем к паролю — так и хранится в хеше bcrypt
 	h, err := bcrypt.GenerateFromPassword([]byte(plain+s.pepper), bcrypt.DefaultCost)
 	if err != nil {
@@ -93,4 +98,17 @@ func (s *UserService) HashPassword(plain string) (string, error) {
 
 func (s *UserService) VerifyPassword(hash, plain string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain+s.pepper)) == nil
+}
+
+func (s *UserService) IsValidHash(hash, str string) bool {
+	if hash == "" {
+		return false
+	}
+
+	hashedPassword, err := s.ToHash(str)
+	if err != nil {
+		return  false
+	}
+
+	return hash == hashedPassword
 }
