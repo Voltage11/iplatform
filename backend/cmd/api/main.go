@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 
+	"github.com/Voltage11/iplatform/internal/appmiddleware"
 	"github.com/Voltage11/iplatform/internal/config"
 	"github.com/Voltage11/iplatform/internal/db"
 	"github.com/Voltage11/iplatform/internal/repo"
@@ -57,6 +58,11 @@ func run() error {
 	userRepo := repo.NewUserRepo(database.Pool())
 
 	// 7. Сервисы
+	jwtService := service.NewJWTService(service.ConfigJWT{
+		SecretKey:  cfg.Jwt.Secret,
+		AccessTTL:  cfg.Jwt.AccessTTL,
+		RefreshTTL: cfg.Jwt.RefreshTTL,
+	})
 	userService := service.NewUserService(userRepo, database, cfg.HashPreffix)
 
 	logger.Info("Запуск сервера на порту", "port", cfg.Server.Port)
@@ -78,6 +84,10 @@ func run() error {
 	r.Use(middleware.ClientIPFromRemoteAddr)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(cfg.Server.ReadTimeout))
+
+	// Извлечение пользователя (глобально для всех маршрутов)
+	authMW := appmiddleware.NewAuthMiddleware(userService, jwtService)
+	r.Use(authMW.ExtractUser)
 
 	return nil
 }

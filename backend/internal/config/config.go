@@ -15,6 +15,7 @@ type Config struct {
 	Server      ServerConfig
 	Database    DatabaseConfig
 	HashPreffix string
+	Jwt         JWTConfig
 }
 
 func New() (*Config, error) {
@@ -38,11 +39,17 @@ func New() (*Config, error) {
 		return nil, err
 	}
 
+	jwtConfig, err := newJwtConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Log:         logCfg,
 		Server:      srv,
 		Database:    db,
 		HashPreffix: hashPreffix,
+		Jwt:         *jwtConfig,
 	}, nil
 }
 
