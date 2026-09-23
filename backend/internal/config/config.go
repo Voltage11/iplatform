@@ -16,6 +16,7 @@ type Config struct {
 	Database DatabaseConfig
 	Pepper   string
 	Jwt      JWTConfig
+	Admin    AdminConfig
 }
 
 func New() (*Config, error) {
@@ -50,6 +51,7 @@ func New() (*Config, error) {
 		Database: db,
 		Pepper:   pepper,
 		Jwt:      *jwtConfig,
+		Admin:    newAdminCinfig(),
 	}, nil
 }
 
