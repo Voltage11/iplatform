@@ -7,7 +7,6 @@ import (
 
 	"github.com/Voltage11/iplatform/internal/appcontext"
 	"github.com/Voltage11/iplatform/internal/domain"
-	"github.com/Voltage11/iplatform/internal/service"
 	"github.com/Voltage11/iplatform/internal/utils/httputil"
 	"github.com/google/uuid"
 )
@@ -71,7 +70,7 @@ func (a *AuthMiddleware) ExtractUser(next http.Handler) http.Handler {
 		}
 
 		// Если пользователь верийицирован и активный, то положим в контекст, по идее позже верификацию вынесу в отдельнуй метод, т.к. условия может быть больше
-		ctxWithUser := context.WithValue(r.Context(), service.UserContextKey, user)
+		ctxWithUser := appcontext.WithUser(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctxWithUser))
 
 	})

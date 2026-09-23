@@ -14,6 +14,19 @@ CREATE TABLE users (
     deleted_at    timestamptz
 );
 
+CREATE TABLE sessions (
+    id                 uuid        PRIMARY KEY,
+    user_id            uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    refresh_token_hash varchar(64) NOT NULL UNIQUE,
+    expires_at         timestamptz NOT NULL,
+    revoked_at         timestamptz,
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    user_agent         varchar(255) NOT NULL DEFAULT '',
+    client_ip          varchar(64)  NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_sessions_user_id ON sessions(user_id);
+CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+
 -- THEMES
 CREATE TABLE themes (
     id            uuid         PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,7 +44,6 @@ CREATE TABLE themes (
 );
 
 CREATE INDEX idx_themes_created_by ON themes(created_by);
-CREATE INDEX idx_themes_active     ON themes(id) WHERE is_active;
 
 -- QUESTIONS
 CREATE TABLE questions (
@@ -64,7 +76,7 @@ CREATE INDEX idx_answers_question_id ON answers(question_id);
 CREATE TABLE test_attempts (
     id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      uuid        NOT NULL REFERENCES users(id),
-    theme_id     uuid        NOT NULL REFERENCES themes(id),
+    theme_id     uuid NOT NULL REFERENCES themes(id) ON DELETE RESTRICT,
     attempt_num  int         NOT NULL CHECK (attempt_num > 0),
     status       varchar(20) NOT NULL
         CHECK (status IN ('in_progress', 'completed', 'expired')),
@@ -87,7 +99,7 @@ CREATE INDEX idx_test_attempts_theme_id ON test_attempts(theme_id);
 CREATE TABLE user_answers (
     id              uuid    PRIMARY KEY DEFAULT gen_random_uuid(),
     test_attempt_id uuid    NOT NULL REFERENCES test_attempts(id) ON DELETE CASCADE,
-    question_id     uuid    NOT NULL REFERENCES questions(id),
+    question_id     uuid    NOT NULL REFERENCES questions(id) ON DELETE RESTRICT, 
     is_correct      boolean NOT NULL DEFAULT false,
     points          int     NOT NULL DEFAULT 0 CHECK (points >= 0),
 

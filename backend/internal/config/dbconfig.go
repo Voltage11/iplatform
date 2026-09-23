@@ -6,7 +6,6 @@ import (
 	"net/url"
 )
 
-// dbconfig.go
 type DatabaseConfig struct {
 	Host     string
 	Port     string

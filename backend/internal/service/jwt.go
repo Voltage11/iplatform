@@ -10,12 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type ContextKey string
-
-const (
-	UserContextKey ContextKey = "user"
-)
-
 // ConfigJWT конфигурация создания длф работы с jwt
 type ConfigJWT struct {
 	SecretKey  string

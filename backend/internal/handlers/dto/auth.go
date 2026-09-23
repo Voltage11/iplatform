@@ -14,16 +14,12 @@ type LoginRequest struct {
 func (l *LoginRequest) Validate() error {
 	l.Email = strings.TrimSpace(l.Email)
 
-	// TODO поменять проверку Email на верную, временное решение
 	if len(l.Email) <= 3 {
-		return apperr.NewBadRequest("Не валидный формат email", nil)
+		return apperr.NewBadRequest("Невалидный формат email", nil)
 	}
-
-	l.Password = strings.TrimSpace(l.Password)
-	if len(l.Email) == 0 {
-		return apperr.NewBadRequest("Пароль ну может быть пустым", nil)
+	if len(l.Password) == 0 {
+		return apperr.NewBadRequest("Пароль не может быть пустым", nil) // было "ну"
 	}
-
 	return nil
 }
 

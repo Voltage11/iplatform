@@ -88,7 +88,6 @@ func (s *UserService) Create(ctx context.Context, user *domain.User) error {
 }
 
 func (s *UserService) ToHash(plain string) (string, error) {
-	// pepper дописываем к паролю — так и хранится в хеше bcrypt
 	h, err := bcrypt.GenerateFromPassword([]byte(plain+s.pepper), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
@@ -98,17 +97,4 @@ func (s *UserService) ToHash(plain string) (string, error) {
 
 func (s *UserService) VerifyPassword(hash, plain string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(plain+s.pepper)) == nil
-}
-
-func (s *UserService) IsValidHash(hash, str string) bool {
-	if hash == "" {
-		return false
-	}
-
-	hashedPassword, err := s.ToHash(str)
-	if err != nil {
-		return  false
-	}
-
-	return hash == hashedPassword
 }

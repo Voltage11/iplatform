@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -29,15 +30,24 @@ func WriteError(w http.ResponseWriter, err error) {
 	var code int
 	var message string
 
-	if validationErrs, ok := err.(validator.ValidationErrors); ok {
-		code = http.StatusBadRequest
-		message = validationErrs.Error()
-	} else if appErr, ok := err.(*apperr.AppError); ok {
-		code = apperr.HTTPStatusFromError(appErr)
-		message = appErr.Message
-	} else {
+	switch {
+	case err == nil:
 		code = http.StatusInternalServerError
-		message = err.Error()
+		message = "неизвестная ошибка"
+	default:
+		var validationErrs validator.ValidationErrors
+		var appErr *apperr.AppError
+		switch {
+		case errors.As(err, &validationErrs):
+			code = http.StatusBadRequest
+			message = validationErrs.Error()
+		case errors.As(err, &appErr):
+			code = apperr.HTTPStatusFromError(appErr)
+			message = appErr.Message
+		default:
+			code = http.StatusInternalServerError
+			message = "внутренняя ошибка сервера"
+		}
 	}
 
 	WriteJSON(w, code, map[string]string{"error": message})

@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 
+	"github.com/Voltage11/iplatform/internal/db"
 	"github.com/Voltage11/iplatform/internal/domain"
 	"github.com/Voltage11/iplatform/internal/types/apperr"
 	"github.com/google/uuid"
@@ -19,71 +20,69 @@ func NewSessionRepo(pool *pgxpool.Pool) *sessionRepo {
 	}
 }
 
-func (s *sessionRepo) Create(ctx context.Context, session *domain.Session) error {
-	sql := `
+func (r *sessionRepo) Create(ctx context.Context, session *domain.Session) error {
+	const sql = `
         INSERT INTO sessions (id, user_id, refresh_token_hash, expires_at, created_at, user_agent, client_ip)
         VALUES ($1, $2, $3, $4, $5, $6, $7)
     `
-
-	result, err := s.pool.Exec(ctx, sql, session.ID,
+	q := db.QuerierFrom(ctx, r.pool)
+	if _, err := q.Exec(ctx, sql,
+		session.ID,
 		session.UserID,
 		session.RefreshTokenHash,
 		session.ExpiresAt,
 		session.CreatedAt,
 		session.UserAgent,
-		session.ClientIP)
-	if err != nil {
+		session.ClientIP,
+	); err != nil {
 		return apperr.NewPostgresError(err)
 	}
-
-	if result.RowsAffected() == 0 {
-		return apperr.NewInternal("сессия не создана", apperr.NewNotFound("Сессия для пользователя не создана", nil))
-	}
-
 	return nil
 }
 
 func (r *sessionRepo) GetByRefreshTokenHash(ctx context.Context, hash string) (*domain.Session, error) {
-	query := `
+	const sql = `
         SELECT id, user_id, refresh_token_hash, expires_at, created_at, revoked_at, user_agent, client_ip
         FROM sessions
         WHERE refresh_token_hash = $1
     `
+	q := db.QuerierFrom(ctx, r.pool)
 	var s domain.Session
-	err := r.pool.QueryRow(ctx, query, hash).Scan(
+	if err := q.QueryRow(ctx, sql, hash).Scan(
 		&s.ID, &s.UserID, &s.RefreshTokenHash, &s.ExpiresAt, &s.CreatedAt, &s.RevokedAt,
 		&s.UserAgent, &s.ClientIP,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, apperr.NewPostgresError(err)
 	}
 	return &s, nil
 }
 
 func (r *sessionRepo) Revoke(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE sessions SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL`
-	result, err := r.pool.Exec(ctx, query, id)
+	const sql = `UPDATE sessions SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL`
+	q := db.QuerierFrom(ctx, r.pool)
+	res, err := q.Exec(ctx, sql, id)
 	if err != nil {
 		return apperr.NewPostgresError(err)
 	}
-	if result.RowsAffected() == 0 {
+	if res.RowsAffected() == 0 {
 		return apperr.NewNotFound("сессия не найдена или уже отозвана", nil)
 	}
 	return nil
 }
 
 func (r *sessionRepo) RevokeAllUserSessions(ctx context.Context, userID uuid.UUID) error {
-	query := `UPDATE sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`
-	_, err := r.pool.Exec(ctx, query, userID)
+	const sql = `UPDATE sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`
+	q := db.QuerierFrom(ctx, r.pool)
+	_, err := q.Exec(ctx, sql, userID)
 	return apperr.NewPostgresError(err)
 }
 
 func (r *sessionRepo) DeleteExpired(ctx context.Context) (int64, error) {
-	query := `DELETE FROM sessions WHERE expires_at < NOW()`
-	result, err := r.pool.Exec(ctx, query)
+	const sql = `DELETE FROM sessions WHERE expires_at < NOW()`
+	q := db.QuerierFrom(ctx, r.pool)
+	res, err := q.Exec(ctx, sql)
 	if err != nil {
 		return 0, apperr.NewPostgresError(err)
 	}
-
-	return result.RowsAffected(), nil
+	return res.RowsAffected(), nil
 }

@@ -50,7 +50,7 @@ func (a *AuthService) Login(ctx context.Context, email, password, userAgent, cli
 		return nil, err
 	}
 	// 2. Проверить пароль
-	if !a.userService.IsValidHash(user.PasswordHash, password) {
+	if !a.userService.VerifyPassword(user.PasswordHash, password) {
 		return nil, apperr.NewUnauthorized("неверный email или пароль", nil)
 	}
 	// 3. Проверить активен ли пользователь
@@ -69,10 +69,7 @@ func (a *AuthService) Login(ctx context.Context, email, password, userAgent, cli
 	}
 
 	// 5. Сохранить сессию
-	refreshHash, err := a.userService.ToHash(refreshToken)
-	if err != nil {
-		return nil, apperr.NewInternal("ошибка хэширования", err)
-	}
+	refreshHash := HashRefreshToken(refreshToken)
 
 	session := &domain.Session{
 		ID:               uuid.New(),
@@ -96,10 +93,7 @@ func (a *AuthService) Login(ctx context.Context, email, password, userAgent, cli
 
 // Logout отзывает сессию по refresh токену
 func (a *AuthService) Logout(ctx context.Context, refreshToken string) error {
-	hashToken, err := a.userService.ToHash(refreshToken)
-	if err != nil {
-		return apperr.NewInternal("ошибка хэширования", nil)
-	}
+	hashToken := HashRefreshToken(refreshToken)
 
 	session, err := a.sessionRepo.GetByRefreshTokenHash(ctx, hashToken)
 	if err != nil {
@@ -110,10 +104,7 @@ func (a *AuthService) Logout(ctx context.Context, refreshToken string) error {
 
 // Refresh выдаёт новую пару токенов по refresh токену
 func (a *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenPair, error) {
-	hashToken, err := a.userService.ToHash(refreshToken)
-	if err != nil {
-		return nil, apperr.NewInternal("Ошибка хэширования", err)
-	}
+	hashToken := HashRefreshToken(refreshToken)
 
 	session, err := a.sessionRepo.GetByRefreshTokenHash(ctx, hashToken)
 	if err != nil {
@@ -131,10 +122,7 @@ func (a *AuthService) Refresh(ctx context.Context, refreshToken string) (*TokenP
 	if err != nil {
 		return nil, apperr.NewInternal("ошибка генерации refresh токена", err)
 	}
-	newRefreshHash, err := a.userService.ToHash(newRefreshToken)
-	if err != nil {
-		return nil, apperr.NewInternal("Ошибка хэширования", err)
-	}
+	newRefreshHash := HashRefreshToken(newRefreshToken)
 
 	newSession := &domain.Session{
 		ID:               uuid.New(),

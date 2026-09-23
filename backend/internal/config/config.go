@@ -11,11 +11,11 @@ type LogConfig struct {
 }
 
 type Config struct {
-	Log         LogConfig
-	Server      ServerConfig
-	Database    DatabaseConfig
-	HashPreffix string
-	Jwt         JWTConfig
+	Log      LogConfig
+	Server   ServerConfig
+	Database DatabaseConfig
+	Pepper   string
+	Jwt      JWTConfig
 }
 
 func New() (*Config, error) {
@@ -34,7 +34,7 @@ func New() (*Config, error) {
 		return nil, fmt.Errorf("database config: %w", err)
 	}
 
-	hashPreffix, err := getEnvReq("HASH_PREFFIX")
+	pepper, err := getEnvReq("PEPPER")
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +45,11 @@ func New() (*Config, error) {
 	}
 
 	return &Config{
-		Log:         logCfg,
-		Server:      srv,
-		Database:    db,
-		HashPreffix: hashPreffix,
-		Jwt:         *jwtConfig,
+		Log:      logCfg,
+		Server:   srv,
+		Database: db,
+		Pepper:   pepper,
+		Jwt:      *jwtConfig,
 	}, nil
 }
 
