@@ -17,6 +17,7 @@ type Config struct {
 	Pepper   string
 	Jwt      JWTConfig
 	Admin    AdminConfig
+	Redis    RedisConfig
 }
 
 func New() (*Config, error) {
@@ -52,6 +53,7 @@ func New() (*Config, error) {
 		Pepper:   pepper,
 		Jwt:      *jwtConfig,
 		Admin:    newAdminCinfig(),
+		Redis:    newRedisConfig(),
 	}, nil
 }
 

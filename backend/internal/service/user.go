@@ -87,6 +87,38 @@ func (s *UserService) Create(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
+type AdminConfig struct {
+	Email     string
+	Password  string
+	FirstName string
+	LastName  string
+}
+
+func (s *UserService) CheckOrCreateAdmin(ctx context.Context, config AdminConfig) error {
+	existUser, err := s.users.GetByEmail(ctx, config.Email)
+	if err != nil {
+		// Если это отсутствующая запись, то двигаемся дальше для создания
+		if !apperr.IsTypeAppError(err, apperr.ErrNotFound) {
+			return err
+		}
+	}
+	// Если нашли, то не создаем, в дальнейшем подумать как менять пароль админу
+	if existUser != nil {
+		return nil
+	}
+
+	newUser := &domain.User{
+		Email:        config.Email,
+		PasswordHash: config.Password,
+		FirstName:    config.FirstName,
+		LastName:     config.LastName,
+		IsAdmin:      true,
+		IsActive:     true,
+	}
+
+	return s.Create(ctx, newUser)
+}
+
 func (s *UserService) ToHash(plain string) (string, error) {
 	h, err := bcrypt.GenerateFromPassword([]byte(plain+s.pepper), bcrypt.DefaultCost)
 	if err != nil {

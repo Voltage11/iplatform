@@ -1,0 +1,18 @@
+// Автоматически находим все контейнеры
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Собираем логи
+loki.source.docker "default" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.containers.targets
+  forward_to = [loki.write.local.receiver]
+}
+
+// Пишем в Loki
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

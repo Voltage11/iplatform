@@ -4,22 +4,130 @@ services:
     container_name: iplatform-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 2470708
-      POSTGRES_DB: iplatform
+      POSTGRES_USER: ${DOCKER_PG_USER}
+      POSTGRES_PASSWORD: ${DOCKER_PG_PASSWORD}
+      POSTGRES_DB: ${DOCKER_PG_DB}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
     ports:
       - "5432:5432"
     volumes:
-      # named volume — данные переживут `docker compose down`, `restart` и т.д.
-      - iplatform_pgdata:/var/lib/postgresql/data      
+      - iplatform_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d iplatform"]
+      test: ["CMD-SHELL", "pg_isready -U ${DOCKER_PG_USER} -d ${DOCKER_PG_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
 
+  redis:
+    image: redis:7-alpine
+    container_name: iplatform-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${DOCKER_REDIS_PASSWORD}
+    ports:
+      - "${DOCKER_REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${DOCKER_REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: iplatform-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: iplatform-loki
+    restart: unless-stopped
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3100/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  alloy:
+    image: grafana/alloy:v1.2.0
+    container_name: iplatform-alloy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - alloy_data:/var/lib/alloy
+    ports:
+      - "12345:12345"
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy /etc/alloy/config.alloy
+    depends_on:
+      loki:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana-oss:11.0.0
+    container_name: iplatform-grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${DOCKER_GF_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${DOCKER_GF_ADMIN_PASSWORD}
+    depends_on:
+      - prometheus
+      - loki
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iplatform-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_SSL_MODE=${DB_SSL_MODE}
+      - DB_MAX_CONNS=${DB_MAX_CONNS}
+      - PEPPER=${PEPPER}
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - ADMIN_FIRST_NAME=${ADMIN_FIRST_NAME}
+      - ADMIN_LAST_NAME=${ADMIN_LAST_NAME}
+      # Переменные кэша Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${DOCKER_REDIS_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 volumes:
   iplatform_pgdata:
     name: iplatform_pgdata
+  redis_data:
+  prometheus_data:
+  loki_data:
+  alloy_data:
+  grafana_data:

@@ -15,11 +15,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/Voltage11/iplatform/internal/appmiddleware"
+	"github.com/Voltage11/iplatform/internal/cache"
 	"github.com/Voltage11/iplatform/internal/config"
 	"github.com/Voltage11/iplatform/internal/db"
 	"github.com/Voltage11/iplatform/internal/handlers"
+	"github.com/Voltage11/iplatform/internal/metrics"
 	"github.com/Voltage11/iplatform/internal/repo"
 	"github.com/Voltage11/iplatform/internal/service"
 	"github.com/Voltage11/iplatform/pkg/applog"
@@ -52,16 +55,28 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// 5. БД
+	// 5. БД Postgres
 	database, err := db.New(ctx, &cfg.Database)
 	if err != nil {
 		return err
 	}
-	logger.Info("Соединение с бд успешно")
+	logger.Info("Соединение с БД успешно")
 	defer database.Close()
 
+	// 5.1. Кэш Redis
+	redisCache, err := cache.New(&cfg.Redis)
+	if err != nil {
+		return fmt.Errorf("redis init: %w", err)
+	}
+	logger.Info("Соединение с Redis успешно")
+	defer redisCache.Close()
+
 	// 6. Репозитории
-	userRepo := repo.NewUserRepo(database.Pool())
+	postgresUserRepo := repo.NewUserRepo(database.Pool())
+
+	// Оборачиваем базовый Postgres-репозиторий в кэш
+	userRepo := repo.NewCachedUserRepo(postgresUserRepo, redisCache.Client(), 15*time.Minute)
+
 	sessionRepo := repo.NewSessionRepo(database.Pool())
 
 	// 7. Сервисы
@@ -73,11 +88,23 @@ func run() error {
 	userService := service.NewUserService(userRepo, database, cfg.Pepper)
 	authService := service.NewAuthService(userService, sessionRepo, jwtService)
 
-	logger.Info("Запуск сервера на порту", "port", cfg.Server.Port)
+	// 8. Учетка админа
+	if cfg.Admin.Email != "" && cfg.Admin.Password != "" {
+		if err := userService.CheckOrCreateAdmin(context.Background(), service.AdminConfig{
+			Email:     cfg.Admin.Email,
+			Password:  cfg.Admin.Password, // чистый пароль, сервис захеширует его сам
+			FirstName: cfg.Admin.FirstName,
+			LastName:  cfg.Admin.LastName,
+		}); err != nil {
+			return fmt.Errorf("Account admin: %w", err)
+		}
+		logger.Warn("Admin ensured", "email", cfg.Admin.Email)
+	}
 
-	// 8. Запуск HTTP-сервера и ожидание ctx.Done()
+	// 9. Роутер
 	r := chi.NewRouter()
-	// CORS middleware
+
+	// CORS
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.Server.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
@@ -87,20 +114,22 @@ func run() error {
 		MaxAge:           300,
 	}))
 
-	// Стандартные middleware chi
-	r.Use(middleware.Timeout(cfg.Server.RequestTimeout))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.ClientIPFromRemoteAddr)
+	r.Use(metrics.Middleware)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(cfg.Server.ReadTimeout))
+	r.Use(middleware.Timeout(cfg.Server.RequestTimeout))
 
-	// Извлечение пользователя (глобально для всех маршрутов)
+	// Извлечение пользователя
 	authMW := appmiddleware.NewAuthMiddleware(userService, jwtService)
 	r.Use(authMW.ExtractUser)
 
-	// Handlers регистрация
+	r.Handle("/metrics", promhttp.Handler())
+
+	// Регистрация хендлеров
 	handlers.NewAuthHandler(authService).Register(r, authMW)
 
+	// 10. HTTP-сервер
 	srv := &http.Server{
 		Addr:         ":" + cfg.Server.Port,
 		Handler:      r,
@@ -108,6 +137,7 @@ func run() error {
 		WriteTimeout: cfg.Server.WriteTimeout,
 		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
+
 	ln, err := net.Listen("tcp", ":"+cfg.Server.Port)
 	if err != nil {
 		return fmt.Errorf("listen: %w", err)
@@ -119,7 +149,9 @@ func run() error {
 			logger.Error("serve", "err", err)
 		}
 	}()
+
 	<-ctx.Done()
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutdownCtx)
