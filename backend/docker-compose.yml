@@ -91,38 +91,6 @@ services:
       - prometheus
       - loki
 
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: iplatform-backend
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-    environment:
-      - DB_HOST=${DB_HOST}
-      - DB_PORT=${DB_PORT}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - DB_NAME=${DB_NAME}
-      - DB_SSL_MODE=${DB_SSL_MODE}
-      - DB_MAX_CONNS=${DB_MAX_CONNS}
-      - PEPPER=${PEPPER}
-      - JWT_SECRET=${JWT_SECRET}
-      - ADMIN_EMAIL=${ADMIN_EMAIL}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - ADMIN_FIRST_NAME=${ADMIN_FIRST_NAME}
-      - ADMIN_LAST_NAME=${ADMIN_LAST_NAME}
-      # Переменные кэша Redis
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=${DOCKER_REDIS_PASSWORD}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
 volumes:
   iplatform_pgdata:
     name: iplatform_pgdata

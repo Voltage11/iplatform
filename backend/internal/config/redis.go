@@ -15,9 +15,15 @@ func (c RedisConfig) Address() string {
 }
 
 func newRedisConfig() RedisConfig {
+	// Сначала проверяем локальную переменную, если её нет — берем докер
+	password := getEnv("REDIS_PASSWORD", "")
+	if password == "" {
+		password = getEnv("DOCKER_REDIS_PASSWORD", "")
+	}
+
 	return RedisConfig{
 		Host:     getEnv("REDIS_HOST", "localhost"),
 		Port:     getEnv("REDIS_PORT", "6379"),
-		Password: getEnv("REDIS_PASSWORD", ""),
+		Password: password,
 	}
 }
